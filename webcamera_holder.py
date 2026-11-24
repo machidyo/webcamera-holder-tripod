@@ -1,32 +1,24 @@
 """
-ELP USB4KHDR01 (38.17 x 38.17 mm, t=1.64 mm) 用 Web カメラホルダ
+ELP USB4KHDR01 (38.17 x 38.17 mm, t=1.64 mm) 用 Web カメラホルダ (三脚ねじ取付版)
 ---------------------------------------------------------------------
 参考: "ELP Camera Housing (USBFHD04H)" by Azure (BY-NC) の構成を踏襲し、
 基板サイズ 32mm -> 38.17mm、裏面縦型 4P コネクタ (配線が真後ろへ出る) に合わせて
-作り直したもの。部品は 4 種類:
+作り直したもの。SmallRig などの 1/4"-20 ボールヘッドを土台にする。部品は 2 種類:
 
-  1. housing : 本体 (前面レンズ開口 + ボス 4 本 + 通気スロット + ヒンジ脚)
-  2. cover   : 裏蓋 (スナップ嵌合、コネクタ直上にケーブル切り欠き、
-               基板の四隅を押さえる柱 4 本 → ねじ無しで基板を固定)
-  3. mount   : L 形ブラケット (上面パッド + 前面アーム、フック無し)。外側 2 面にテープ貼り付け用の
-               プレートを持ち、モニタの上辺や側辺にテープ / 両面テープで留められる
-  4. pin     : ヒンジピン (D 形断面。脚とマウントの D 穴に通すと回転が止まり、
-               角度が FIXED_TILT_DEG に固定される)
-               太さ違いを PIN_SIZES 分だけ出力し、合うものを選ぶ
-
-ねじ無しで組める構成。M2 ねじが手に入った場合は、本体のボス穴をそのまま使って
-基板をねじ止めすることもできる。
+  1. housing : 本体 (前面レンズ開口 + ボス 4 本 + 通気スロット)。
+               ボスには M2 インサートナット (ミスミ MBIS2-3-4) を熱圧入し、基板を M2 ねじで留める
+  2. cover   : 裏蓋 (スナップ嵌合、コネクタ直上にケーブル切り欠き)。
+               中央に 1/4"-20 インサートナット (外径 8 x 長さ 6 mm) を熱圧入できるよう
+               板を厚くしてあり、ここにボールヘッドのねじを締め込む
 
 座標系 (housing):
   原点 = 基板中心、+Z = 基板の裏側 (カバー側)、-Z = レンズ側、+Y = 上 (コネクタ側)
   housing はレンズ面が Z=0 にあり、そのままの向きで印刷できる (レンズ面がベッド)。
-  mount も housing 座標系の「組み立て位置」で作り、印刷時に寝かせる。
-  このため脚の D 穴とマウントの D 穴は同じ向きで切られ、ピンを通せば角度が揃う。
+  cover は外面 (インサート穴の開口側) を下にして印刷する。
 
 Bambu Lab A1 mini / PLA, 0.2mm レイヤ, 壁 2-3 本を想定。
 """
 
-import math
 import os
 from pathlib import Path
 
@@ -45,8 +37,12 @@ BOARD = 38.17            # 基板 縦横
 BOARD_T = 1.64           # 基板 厚さ
 BOARD_CLR = 0.40         # 基板周囲の片側クリアランス
 HOLE_PITCH = 34.0        # 取付穴ピッチ (写真から推定、要確認)
-SCREW_HOLE_D = 1.8       # M2 タッピング下穴
-BOSS_D = 6.0             # M2 ボス外径
+# M2 インサートナット (ミスミ MBIS2-3-4: D1=3.0, D2=3.3, L=4.0)
+#   メーカー推奨: 下穴 = D1 + 0.05、穴深さ >= L + 0.5 (熱圧入)、ボス外径 >= D1 x 2
+M2_INSERT_HOLE_D = 3.05  # 下穴径
+M2_INSERT_L = 4.0        # インサート長さ
+M2_INSERT_DEPTH = 6.0    # 穴深さ (L + 0.5 = 4.5 以上。ねじ先の逃げを含めて深めに)
+BOSS_D = 6.0             # ボス外径 (D1 x 2)
 
 LENS_OPEN = 22.5         # 前面レンズ開口 (正方形)。ホルダ台座 約20mm角 + 余裕
 LENS_OPEN_R = 1.0        # 開口の角 R
@@ -60,7 +56,7 @@ CONN_CLR = 1.0           # 切り欠きの片側余裕
 # 裏蓋のケーブル切り欠き。ELP (コネクタ中央) と ArduCam UC-844 (横向きコネクタが前面から見て
 # 右寄り X=+1..+9 付近、配線が基板に沿って出る) の両方に使えるよう左右対称に広げる
 NOTCH_W = 24.0           # 切り欠き幅 (X)。押さえ柱 (X=±17) とその根元を残せる上限付近
-NOTCH_FROM_EDGE = 12.0   # 基板上辺から切り欠き下端までの距離
+NOTCH_FROM_EDGE = 11.5   # 基板上辺から切り欠き下端までの距離 (中央のインサート穴の肉厚を残す)
 CABLE_WALL_SLOT = True   # 上壁にもケーブル用スリットを入れる (上方向にも逃がせる)
 CABLE_SLOT_W = 5.0       # 上壁スリット幅 (ケーブル径 + 余裕)
 CABLE_SLOT_D = 6.0       # 上壁スリット深さ (背面端から)
@@ -87,19 +83,19 @@ VENT_PITCH = 3.5         # スロット間隔
 VENT_SIDE_XS = [i * VENT_PITCH for i in range(-3, 4)]        # 左右壁: 7 本 (|Y| <= 11.4、ボスと干渉しない)
 VENT_TOP_XS = [s * x for s in (-1, 1) for x in (4.5, 8.0, 11.5)]  # 上壁: 中央のケーブルスリットを避けて 6 本
 
-# --- ヒンジ脚 (本体下側、マウントを挟む) ---
-LEG_T = 4.0              # 脚厚 (X)
-LEG_GAP = 7.0            # 脚の内側間隔 (マウント厚 6.5 + 0.5)
-LEG_LEN = 14.4           # 本体下壁からの突き出し長
-LEG_H = 11.3             # 脚の奥行 (前面 Z=0 から)
-PIVOT_FROM_BOX = 8.7     # 本体下壁 -> ピボット中心
-PIVOT_Z = 5.7            # ピボット中心の Z
-PIVOT_Y = -OUTER / 2 - PIVOT_FROM_BOX
-LEG_HOLE_D = 4.2         # ピン穴径 (D 形。平面側は印刷時に上になるのでブリッジが短くて済む)
-HOLE_FLAT_FROM_AXIS = 1.2  # 穴の平面 (D の直線部) の軸からの距離。平面は +Z 側
-
 # --- 裏蓋 ---
-COVER_T = 2.5            # 板厚 (2.0 -> 2.5)
+# 中央の 1/4"-20 インサートナット (Aicosineg 真鍮ローレット: 外径 8.0, L=6.0。Amazon B0CMXJ57TP)
+#   下穴はローレット外径より 0.4 mm 細くして樹脂に食い込ませる (印刷で穴はさらに 0.1 mm ほど縮む)。
+#   穴深さはインサート長ではなく、ボールヘッドのねじの突き出し (実測 約 7 mm) + 余裕で決める。
+TRIPOD_INSERT_OD = 8.0         # インサートのローレット外径
+TRIPOD_INSERT_L = 6.0          # インサート長さ
+TRIPOD_SCREW_LEN = 7.0         # ボールヘッドの 1/4 ねじの突き出し長さ (実測)
+TRIPOD_INSERT_HOLE_D = 7.6     # 下穴径 (緩ければ 7.5、入らなければ 7.7)
+TRIPOD_INSERT_DEPTH = TRIPOD_SCREW_LEN + 1.5   # 止まり穴の深さ 8.5 (ねじが底突きしない)
+TRIPOD_INSERT_WALL = 3.3       # 穴まわりの最小肉厚
+TRIPOD_INSERT_FLOOR = 1.0      # 穴底に残す板厚 (基板側へ貫通させない)
+assert TRIPOD_INSERT_DEPTH >= TRIPOD_INSERT_L + 0.5, "1/4 インサート穴が浅すぎる"
+COVER_T = TRIPOD_INSERT_DEPTH + TRIPOD_INSERT_FLOOR   # 板厚 9.5 (インサートとねじが入る分だけ厚くする)
 LIP_H = 3.5              # 嵌合リップ高さ (1.5 -> 3.5: 溝の上に受け棚を残すため)
 LIP_T = 2.0              # リップ厚
 LIP_CLR = 0.15           # リップ外面と本体内壁の片側隙間
@@ -111,9 +107,11 @@ GROOVE_DEPTH = 0.9       # 本体内壁の受け溝深さ (0.5 -> 0.9)
 LEDGE_T = LIP_H - 0.1 - (SNAP_H + 0.3)
 assert LEDGE_T >= 1.0, f"受け棚が薄すぎる: {LEDGE_T:.2f}"
 assert SNAP_PROUD <= GROOVE_DEPTH + LIP_CLR, "突起が溝に収まらない"
+assert M2_INSERT_DEPTH >= M2_INSERT_L + 0.5 and M2_INSERT_DEPTH <= STANDOFF, "M2 インサート穴の深さが不正"
+assert BOARD / 2 - NOTCH_FROM_EDGE >= TRIPOD_INSERT_HOLE_D / 2 + TRIPOD_INSERT_WALL,     "ケーブル切り欠きが 1/4 インサート穴に近すぎる"
 
-# --- 基板押さえ (裏蓋の柱。ねじの代わりに基板をボスとの間に挟む) ---
-BOARD_PRESS = True       # 柱を付ける
+# --- 基板押さえ (裏蓋の柱。ねじを使わない場合に基板をボスとの間に挟む) ---
+BOARD_PRESS = False      # 柱を付ける (M2 ねじ止めではねじ頭と干渉するので無効)
 PRESS_POST_D = 3.5       # 柱の直径 (取付穴まわりのランドを押す)
 PRESS_INTERF = 0.15      # 押し込み量 (スナップの遊び 0.2mm 以内)
 PRESS_PIN = False        # 柱の先に基板穴へ入る位置決めピンを付ける
@@ -123,72 +121,12 @@ PRESS_PIN_LEN = 2.5
 LIP_OUT = INNER - 2 * LIP_CLR
 LIP_IN = LIP_OUT - 2 * LIP_T
 
-# --- マウント (L 形。housing 座標系の組み立て位置で作る) ---
-#   上面パッドがモニタ上面に載り、前面アームがモニタ前面に沿って下りる。
-#   ピボットボスは前面アームの前側に張り出し、本体の脚がこれを挟む。
-MOUNT_T = 6.5            # 厚さ (X)。脚の間隔 7.0 - 0.5
-ARM_W = 5.0              # 前面アームの幅 (Z)
-PAD_T = 5.0              # 上面パッドの厚さ (Y)
-PAD_LEN = 28.0           # モニタ前面からパッド後端までの長さ
-ARM_BELOW = 30.0         # ピボット中心からアーム下端までの長さ
-MOUNT_BOSS_R = 5.5       # ピボットボス半径 (脚の奥行 11.3 に収まる)
-MONITOR_FACE_DZ = MOUNT_BOSS_R + 2.0   # ピボット中心 -> モニタ前面 (= アーム背面) の距離 (+Z)。俯角 30° でも脚がモニタに当たらない値
-PAD_TOP_CLR = 1.0                      # パッド上面と本体下壁の隙間 (FIXED_TILT_DEG=0 のとき。俯角を付けるほど隙間は広がる)
-PAD_TOP_DY = PIVOT_FROM_BOX - PAD_TOP_CLR   # ピボット中心 -> パッド上面 (+Y) = 7.7
-MONITOR_TOP_DY = PAD_TOP_DY - PAD_T         # ピボット中心 -> モニタ上面 (+Y) = 2.7
-FIXED_TILT_DEG = 27.0    # レンズの俯角 (+ で下向き)。D 穴の向きで決まる固定角。初版の写真の姿勢から読み取った値
-MOUNT_HOLE_D = LEG_HOLE_D  # ピン穴。脚と同じ D 形
-
-# --- 貼り付け用プレート (テープ / 両面テープ / 面ファスナー用。L の外側 2 面を広い面にする) ---
-#   寝かせて印刷するため、プレートはバーの片側面と面一にして反対側へ張り出す
-#   (両側に張り出すとバーとボスが浮いてサポートが要る)。
-PLATES = True
-PLATE_W = 26.0           # プレート幅 (X)。バー 6.5 を含む
-PLATE_T = 2.0            # プレート厚
-PLATE_R = 3.0            # プレート角 R
-PLATE_SIDE = 1           # 張り出す向き (+1: 前面から見て右、-1: 左)
-PAD_PLATE_V0 = LEG_H - PIVOT_Z + 0.4   # パッド側プレートの前端 (脚の背面 5.6 より後ろ) = 6.0
-ARM_PLATE_U0 = -9.0      # アーム側プレートの上端 (俯角 35° まで脚が当たらない)
-WEB_X0 = LEG_GAP / 2 + LEG_T + 1.0   # 脚の外側面 7.5 + 1.0。ここから外側は L の角まで板を繋ぐ
-
-# --- 卓上スタンド (机に置く台座。mount の代わりに使う) ---
-#   ピボットボスから柱を下ろし、平らなベース板で机に立てる。ベース板を下にして印刷 (サポート不要)。
-MOUNT_STYLE = "desk"     # 3MF に入れる台座: "desk" (卓上スタンド) / "monitor" (L 形マウント)
-DESK_TILT_DEG = -10.0    # 卓上での俯角 (+ で下向き、- で上向き)。D 穴の向きで固定
-STAND_H = 30.0           # 机面 -> ピボット中心の高さ。レンズ中心は 机面 + STAND_H + 約 30
-POST_W = 9.0             # 柱の前後幅 (Z)
-BASE_W = 56.0            # ベース板の幅 (X)
-BASE_FRONT = 28.0        # ピボット -> ベース前端 (レンズ側, -Z)
-BASE_BACK = 38.0         # ピボット -> ベース後端 (ケーブル側, +Z)。重心とケーブルの引きに備えて後ろを長く
-BASE_T = 4.0             # ベース板厚
-BASE_R = 6.0             # ベース板の角 R
-RIB_T = 4.0              # リブ厚
-RIB_TOP = -11.0          # リブ上端 (ピボット基準)。脚の可動範囲 (半径約 8.5) より下
-RIB_REACH = 18.0         # リブの張り出し (柱中心から)
-
-# --- ヒンジピン (D 形断面) ---
-PIN_SIZES = (3.9, 4.0, 4.1)   # 軸径の候補。頭の点の数 1,2,3 で区別 (4.0 が実績値)
-PIN_LEN = 2 * LEG_T + LEG_GAP  # 軸長 15 (両脚を貫通し、反対側で面一)
-PIN_HEAD_D = 7.0              # 頭の直径
-PIN_HEAD_T = 1.6              # 頭の厚さ
-PIN_FLAT_FROM_AXIS = 1.1      # 軸の平面 (D の直線部) の軸中心からの距離。穴の 1.2 に対し 0.1 の遊び
-PIN_TIP_CHAMFER = 0.4         # 先端の面取り (差し込みやすく)
-
 OUT_DIR = Path(__file__).with_name("output")
 
 
 # ---------------------------------------------------------------------------
 # 補助
 # ---------------------------------------------------------------------------
-def d_profile(r: float, flat_from_axis: float, center=(0.0, 0.0)) -> None:
-    """D 形断面 (円 + スケッチローカル +y 側を平面でカット)。BuildSketch 内で呼ぶ。"""
-    cx, cy = center
-    with Locations((cx, cy)):
-        Circle(r)
-    with Locations((cx, cy + flat_from_axis + r)):
-        Rectangle(2 * r + 1.0, 2 * r, mode=Mode.SUBTRACT)
-
-
 def vent_cutter(xs, height: float, width: float = VENT_SLOT_W) -> Part:
     """縦長スロット列のカッター。ローカル XY に作り (Y がスロット長手)、
     Z 方向に壁を貫通する厚みで押し出す。"""
@@ -217,21 +155,6 @@ def build_housing() -> Part:
         Box(OUTER, OUTER, DEPTH, align=(Align.CENTER, Align.CENTER, Align.MIN))
         fillet(hp.edges().filter_by(Axis.Z), CORNER_R)
 
-        # ヒンジ脚
-        for sx in (-1, 1):
-            with BuildPart() as leg:
-                with BuildSketch(Plane.YZ) as lp:
-                    # Plane.YZ: ローカル x = 全体 Y, ローカル y = 全体 Z
-                    Rectangle(LEG_LEN + 1.0, LEG_H, align=(Align.MAX, Align.MIN))
-                    far_top = lp.vertices().sort_by(Axis.X)[:2].sort_by(Axis.Y)[-1]
-                    fillet(far_top, 3.0)
-                extrude(amount=LEG_T / 2, both=True)
-                try:
-                    chamfer(leg.edges().filter_by(Axis.Z).group_by(Axis.Y)[0], 0.8)
-                except Exception:
-                    pass
-            add(leg.part.moved(Location((sx * (LEG_GAP / 2 + LEG_T / 2), -OUTER / 2 + 1.0, 0))))
-
         # 前面外周の面取り
         try:
             chamfer(hp.faces().sort_by(Axis.Z)[0].edges(), FRONT_CHAMFER)
@@ -250,28 +173,23 @@ def build_housing() -> Part:
         except Exception as e:
             print("lead-in chamfer skipped:", e)
 
-        # M2 ボス (前面板内面から STANDOFF の高さ)
+        # M2 インサート用ボス (前面板内面から STANDOFF の高さ)
         with BuildSketch(Plane.XY.offset(FRONT_T)):
             with Locations((HOLE_OFF, HOLE_OFF), (-HOLE_OFF, HOLE_OFF),
                            (HOLE_OFF, -HOLE_OFF), (-HOLE_OFF, -HOLE_OFF)):
                 Circle(BOSS_D / 2)
         extrude(amount=STANDOFF)
-        # ボスのタッピング穴 (前面板は貫通させない)
+        # M2 インサートの下穴 (基板側から熱圧入。前面板は貫通させない)
         with BuildSketch(Plane.XY.offset(BOARD_Z)):
             with Locations((HOLE_OFF, HOLE_OFF), (-HOLE_OFF, HOLE_OFF),
                            (HOLE_OFF, -HOLE_OFF), (-HOLE_OFF, -HOLE_OFF)):
-                Circle(SCREW_HOLE_D / 2)
-        extrude(amount=-(STANDOFF - 1.0), mode=Mode.SUBTRACT)
+                Circle(M2_INSERT_HOLE_D / 2)
+        extrude(amount=-M2_INSERT_DEPTH, mode=Mode.SUBTRACT)
 
         # レンズ開口
         with BuildSketch(Plane.XY):
             RectangleRounded(LENS_OPEN, LENS_OPEN, LENS_OPEN_R)
         extrude(amount=FRONT_T + 0.1, both=True, mode=Mode.SUBTRACT)
-
-        # ピボット穴 (両脚を X 方向に貫通、D 形。平面は +Z 側 = 印刷時の上側)
-        with BuildSketch(Plane.YZ.offset(-OUTER / 2)):
-            d_profile(LEG_HOLE_D / 2, HOLE_FLAT_FROM_AXIS, (PIVOT_Y, PIVOT_Z))
-        extrude(amount=OUTER, mode=Mode.SUBTRACT)
 
         # 裏蓋スナップ受け溝 (左右内壁)。溝の上に LEDGE_T の受け棚が残る
         groove_zc = DEPTH - LIP_H + 0.1 + (SNAP_H + 0.3) / 2
@@ -334,7 +252,11 @@ def build_cover() -> Part:
             extrude(amount=SNAP_LEN / 2, both=True)
         # ケーブル切り欠き (コネクタ直上から上端まで)
         with Locations((0.0, (notch_y0 + OUTER / 2 + 1) / 2, 0)):
-            Box(notch_w, OUTER / 2 + 1 - notch_y0, 20, mode=Mode.SUBTRACT)
+            Box(notch_w, OUTER / 2 + 1 - notch_y0, 2 * (COVER_T + LIP_H + 1), mode=Mode.SUBTRACT)
+        # 1/4"-20 インサートナットの下穴 (外面中央から止まり穴。外面側から熱圧入する)
+        with BuildSketch(Plane.XY.offset(COVER_T)):
+            Circle(TRIPOD_INSERT_HOLE_D / 2)
+        extrude(amount=-TRIPOD_INSERT_DEPTH, mode=Mode.SUBTRACT)
         # 基板押さえの柱 (板の内面 Z=0 から基板裏面まで + 押し込み量)
         if BOARD_PRESS:
             post_len = DEPTH - (BOARD_Z + BOARD_T) + PRESS_INTERF
@@ -352,184 +274,26 @@ def build_cover() -> Part:
 
 
 # ---------------------------------------------------------------------------
-# 3. マウント mount (housing 座標系の組み立て位置。X = 厚さ、Y = 上、Z = 後ろ)
-# ---------------------------------------------------------------------------
-def build_mount() -> Part:
-    # ピボット中心を原点とするローカル座標 (u = +Y 上, v = +Z 後ろ) で作り、
-    # FIXED_TILT_DEG だけ X 軸まわりに回してピボット位置へ移す。D 穴は housing 座標の向きで切る。
-    # → 組み立てると本体がマウントに対して FIXED_TILT_DEG 俯角になる。
-    v_back = MONITOR_FACE_DZ            # アーム背面 (モニタ前面に当たる)
-    v_front = v_back - ARM_W            # アーム前面
-    v_end = v_back + PAD_LEN            # パッド後端
-    u_top = PAD_TOP_DY                  # パッド上面
-    u_pad = MONITOR_TOP_DY              # パッド下面 (モニタ上面に載る)
-    u_bot = -ARM_BELOW                  # アーム下端
-    with BuildPart() as mp:
-        with BuildSketch(Plane.YZ) as sk:   # ローカル x = Y (u), y = Z (v)
-            Polygon((u_top, v_front), (u_top, v_end), (u_pad, v_end), (u_pad, v_back),
-                    (u_bot, v_back), (u_bot, v_front), align=None)
-            Circle(MOUNT_BOSS_R)        # ピボットボス (原点)
-            vs = sk.vertices()
-            # 角の処理 (スケッチローカル座標: x=u, y=v)
-            fillet(vs.filter_by_position(Axis.X, u_top - 0.1, u_top + 0.1)
-                     .filter_by_position(Axis.Y, v_front - 0.1, v_front + 0.1), 1.5)   # 曲がり角の外側 (ボス交点までの辺が短いので小さめ)
-            fillet(vs.filter_by_position(Axis.Y, v_end - 0.1, v_end + 0.1), 2.0)        # パッド後端
-            fillet(vs.filter_by_position(Axis.X, u_bot - 0.1, u_bot + 0.1), 2.0)        # アーム下端
-            # ボスとアーム前面の付け根 (凹 R)。上側はパッド角までの辺が短いので小さめ
-            for lo, hi, r in ((-MOUNT_BOSS_R, 0.0, 1.0), (0.0, MOUNT_BOSS_R, 0.5)):
-                try:
-                    conc = (sk.vertices().filter_by_position(Axis.X, lo, hi)
-                            .filter_by_position(Axis.Y, v_front - 0.1, v_front + 0.1))
-                    fillet(conc, r)
-                except Exception as e:
-                    print("mount concave fillet skipped:", e)
-        extrude(amount=MOUNT_T / 2, both=True)
-        try:
-            chamfer(mp.edges().filter_by(Plane.YZ), 0.5)
-        except Exception as e:
-            print("mount chamfer skipped:", e)
-        if PLATES:
-            xc = PLATE_SIDE * (PLATE_W / 2 - MOUNT_T / 2)   # プレート中心 X (バーの片側面と面一)
-            # パッド側プレート: 下面をパッド下面 (モニタ上面に当たる面) と面一に
-            with BuildSketch(Plane.XZ.offset(-u_pad)):      # 法線 -Y、原点 Y = u_pad
-                with Locations((xc, (PAD_PLATE_V0 + v_end) / 2)):
-                    RectangleRounded(PLATE_W, v_end - PAD_PLATE_V0, PLATE_R)
-            extrude(amount=-PLATE_T)                         # +Y 側へ
-            # アーム側プレート: 背面をアーム背面 (モニタ前面に当たる面) と面一に。
-            # 脚より外側 (|X| >= WEB_X0) では上まで伸ばしてパッド側プレートと繋ぎ、連続した L 面にする
-            x_out = PLATE_SIDE * (PLATE_W - MOUNT_T / 2)       # プレート外端 X
-            with BuildSketch(Plane.XY.offset(v_back)):       # 法線 +Z、原点 Z = v_back
-                with Locations((xc, (u_bot + ARM_PLATE_U0) / 2)):
-                    RectangleRounded(PLATE_W, ARM_PLATE_U0 - u_bot, PLATE_R)
-                with Locations(((PLATE_SIDE * WEB_X0 + x_out) / 2, (ARM_PLATE_U0 + u_pad + PLATE_T) / 2)):
-                    Rectangle(abs(x_out - PLATE_SIDE * WEB_X0), u_pad + PLATE_T - ARM_PLATE_U0)
-            extrude(amount=-PLATE_T)                         # -Z 側へ
-    part = mp.part.rotate(Axis.X, FIXED_TILT_DEG).moved(Location((0, PIVOT_Y, PIVOT_Z)))
-    # ピボット D 穴 (面取り後に開けて、穴の縁は面取りしない)。向きは脚の穴と同じ
-    span = PLATE_W + MOUNT_T
-    with BuildPart() as mp2:
-        add(part)
-        with BuildSketch(Plane.YZ.offset(-span)):
-            d_profile(MOUNT_HOLE_D / 2, HOLE_FLAT_FROM_AXIS, (PIVOT_Y, PIVOT_Z))
-        extrude(amount=2 * span, mode=Mode.SUBTRACT)
-    return mp2.part
-
-
-# ---------------------------------------------------------------------------
-# 3b. 卓上スタンド stand (housing 座標系の組み立て位置。DESK_TILT_DEG だけ本体が傾く)
-# ---------------------------------------------------------------------------
-def build_stand_local() -> Part:
-    """ピボット中心を原点、机に対して水平な座標 (Y = 上, Z = 後ろ) で作ったスタンド。"""
-    base_top = -STAND_H + BASE_T
-    with BuildPart() as sp:
-        # 柱 + ピボットボス (X 厚 MOUNT_T、脚の間に入る)
-        with BuildSketch(Plane.YZ):          # ローカル x = Y, y = Z
-            Circle(MOUNT_BOSS_R)
-            with Locations(((base_top - 0.0) / 2 - 0.5, 0)):
-                Rectangle(-base_top + 1.0, POST_W)
-        extrude(amount=MOUNT_T / 2, both=True)
-        # ベース板 (机に接する面 Y = -STAND_H)
-        with BuildSketch(Plane.XZ.offset(STAND_H)):   # 法線 -Y、原点 Y = -STAND_H
-            with Locations((0, (BASE_BACK - BASE_FRONT) / 2)):   # ローカル y = +Z
-                RectangleRounded(BASE_W, BASE_FRONT + BASE_BACK, BASE_R)
-        extrude(amount=-BASE_T)                       # +Y 側へ
-        # リブ (柱の左右と前後。脚が回る範囲より下だけ)
-        h = RIB_TOP - base_top
-        for sx in (-1, 1):                            # 左右リブ (X-Y 面の三角形)
-            with BuildSketch(Plane.XY):
-                Polygon((sx * MOUNT_T / 2 - sx * 0.5, RIB_TOP), (sx * MOUNT_T / 2 - sx * 0.5, base_top - 0.5),
-                        (sx * RIB_REACH, base_top - 0.5), align=None)
-            extrude(amount=RIB_T / 2, both=True)
-        for sz in (-1, 1):                            # 前後リブ (Y-Z 面の三角形)
-            with BuildSketch(Plane.YZ):
-                Polygon((RIB_TOP, sz * (POST_W / 2 - 0.5)), (base_top - 0.5, sz * (POST_W / 2 - 0.5)),
-                        (base_top - 0.5, sz * RIB_REACH), align=None)
-            extrude(amount=MOUNT_T / 2, both=True)
-    return sp.part
-
-
-def build_stand() -> Part:
-    part = build_stand_local().rotate(Axis.X, DESK_TILT_DEG).moved(Location((0, PIVOT_Y, PIVOT_Z)))
-    with BuildPart() as sp2:
-        add(part)
-        with BuildSketch(Plane.YZ.offset(-BASE_W)):
-            d_profile(MOUNT_HOLE_D / 2, HOLE_FLAT_FROM_AXIS, (PIVOT_Y, PIVOT_Z))
-        extrude(amount=2 * BASE_W, mode=Mode.SUBTRACT)
-    return sp2.part
-
-
-# ---------------------------------------------------------------------------
-# 4. ヒンジピン pin (軸 = X 方向、寝かせた印刷向きで作成。底面の平面が D の直線部)
-# ---------------------------------------------------------------------------
-def build_pin(d: float, marks: int) -> Part:
-    with BuildPart() as pp:
-        # 軸 (X = 0..PIN_LEN)
-        with BuildSketch(Plane.YZ):
-            Circle(d / 2)
-        extrude(amount=PIN_LEN)
-        tip = pp.faces().sort_by(Axis.X)[-1]
-        chamfer(tip.edges(), PIN_TIP_CHAMFER)
-        # 頭 (X = -PIN_HEAD_T..0)
-        with BuildSketch(Plane.YZ):
-            Circle(PIN_HEAD_D / 2)
-        extrude(amount=-PIN_HEAD_T)
-        # 太さの目印: 頭の外面に小さな点を marks 個
-        with BuildSketch(Plane.YZ.offset(-PIN_HEAD_T)):
-            with GridLocations(1.6, 0, marks, 1):
-                Circle(0.4)
-        extrude(amount=0.4, mode=Mode.SUBTRACT)
-        # D 形の平面 (軸と頭を通しでカット。ベッドに平らに置ける)
-        z_cut = -PIN_FLAT_FROM_AXIS
-        with Locations((PIN_LEN / 2 - PIN_HEAD_T / 2, 0, z_cut - 5)):
-            Box(PIN_LEN + PIN_HEAD_T + 2, PIN_HEAD_D + 2, 10, mode=Mode.SUBTRACT)
-    return pp.part.moved(Location((0, 0, PIN_FLAT_FROM_AXIS)))
-
-
-# ---------------------------------------------------------------------------
 # 部品の生成
 # ---------------------------------------------------------------------------
 housing = build_housing()
 cover = build_cover()
-mount = build_mount()
-stand = build_stand()
-pins = [(d, build_pin(d, i + 1)) for i, d in enumerate(PIN_SIZES)]
-
-# 印刷向きの部品 (housing はそのまま、cover は裏返して Z=0 に、mount は寝かせる)
+# 印刷向きの部品 (housing はそのまま、cover は裏返して外面を Z=0 に)
 housing_print = housing
 cover_print = cover.rotate(Axis.Y, 180).moved(Location((0, 0, DEPTH + COVER_T)))
-# mount はバーと面一の側 (プレートが張り出していない側) を下にして寝かせる
-mount_print = place(mount.rotate(Axis.Y, -90 * PLATE_SIDE), 0, 0)
-# stand は机に置く姿勢に戻し (傾きを解除)、ベース板の底面 (-Y) を下にする
-stand_print = place(stand.moved(Location((0, -PIVOT_Y, -PIVOT_Z))).rotate(Axis.X, -DESK_TILT_DEG)
-                    .rotate(Axis.X, 90), 0, 0)
-base_print = stand_print if MOUNT_STYLE == "desk" else mount_print
-
 if __name__ == "__main__":
     OUT_DIR.mkdir(exist_ok=True)
     export_stl(housing_print, str(OUT_DIR / "housing.stl"))
     export_stl(cover_print, str(OUT_DIR / "cover.stl"))
-    export_stl(mount_print, str(OUT_DIR / "mount.stl"))
     export_step(housing_print, str(OUT_DIR / "housing.step"))
     export_step(cover_print, str(OUT_DIR / "cover.step"))
-    export_step(mount_print, str(OUT_DIR / "mount.step"))
-    export_stl(stand_print, str(OUT_DIR / "stand.stl"))
-    export_step(stand_print, str(OUT_DIR / "stand.step"))
-    for d, pin in pins:
-        export_stl(pin, str(OUT_DIR / f"pin_{d:.1f}.stl"))
     # 全部品を並べた 3MF (Bambu Studio にそのまま読み込める)
-    pin_row = [place(pin, -45, -45 - 12 * i) for i, (_, pin) in enumerate(pins)]
     m = Mesher()
     m.add_shape([
         place(housing_print, -35, 10),
         place(cover_print, 25, 10),
-        place(base_print, 25, -45),
-    ] + pin_row, part_number="webcamera_holder")
+    ], part_number="webcamera_holder")
     m.write(str(OUT_DIR / "webcamera_holder.3mf"))
-    # 再印刷用: 裏蓋 + ピンだけの 3MF
-    m = Mesher()
-    m.add_shape([place(cover_print, 0, 0)] + [place(pin, -45, -15 + 12 * i)
-                                              for i, (_, pin) in enumerate(pins)], part_number="reprint")
-    m.write(str(OUT_DIR / "reprint_cover_pins.3mf"))
     print("exported to", OUT_DIR)
 
     if show is not None and not os.environ.get("NO_SHOW"):
@@ -538,10 +302,8 @@ if __name__ == "__main__":
             show(
                 housing_print,
                 cover_print.moved(Location((60, 10, 0))),
-                base_print.moved(Location((60, -45, 0))),
-                *[pin.moved(Location((100, -45 + 12 * i, 0))) for i, (_, pin) in enumerate(pins)],
-                names=["housing", "cover", MOUNT_STYLE] + [f"pin_{d:.1f}" for d, _ in pins],
-                colors=["lightblue", "gray", "dimgray"] + ["orange"] * len(pins),
+                names=["housing", "cover"],
+                colors=["lightblue", "gray"],
             )
         except Exception as e:  # viewer 未起動など
             print("show() skipped:", e)
